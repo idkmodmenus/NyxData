@@ -36,26 +36,22 @@ export async function onRequestPost(context) {
     ]);
 
     const allBreaches  = [];
-    const sourceStatus = [];
+    let   sourcesOk    = 0;
+    let   sourcesTotal = 4;
 
     for (const s of settled) {
       const r = s.status === 'fulfilled'
         ? s.value
         : { source: 'Unknown', error: s.reason?.message || 'Failed', breaches: [] };
 
-      sourceStatus.push({
-        source: r.source,
-        status: r.error ? `error: ${r.error}` : `${r.breaches.length} result(s)`,
-        count:  r.breaches.length,
-        error:  r.error || null,
-      });
+      if (!r.error) sourcesOk++;
       allBreaches.push(...(r.breaches || []));
     }
 
-    // Deduplicate: same source + normalised name
+    // Deduplicate: normalised name only (hide internal source names)
     const seen   = new Set();
     const unique = allBreaches.filter(b => {
-      const key = `${b.source}|${(b.name || '').toLowerCase().replace(/[\s_-]+/g, '')}`;
+      const key = (b.name || '').toLowerCase().replace(/[\s_-]+/g, '');
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -69,6 +65,9 @@ export async function onRequestPost(context) {
       return (b.date || '0000').localeCompare(a.date || '0000');
     });
 
+    // Overwrite all source labels — everything shows as "Nyx Data"
+    unique.forEach(b => { b.source = 'Nyx Data'; });
+
     // Cross-reference our curated local DB by the email domain
     const dbMatches = await crossReferenceDB(domain, context);
 
@@ -77,9 +76,16 @@ export async function onRequestPost(context) {
       infostealers:  unique.filter(b => b.isInfostealer).length,
       breachRecords: unique.filter(b => !b.isInfostealer).length,
       dbMatches:     dbMatches.length,
-      sourcesQueried: 4,
-      sourcesResponded: sourceStatus.filter(s => !s.error).length,
+      sourcesQueried:   sourcesTotal,
+      sourcesResponded: sourcesOk,
     };
+
+    // Single unified status shown to frontend
+    const sourceStatus = [{
+      source: 'Nyx Data',
+      status: `${unique.length} result(s) across ${sourcesOk}/${sourcesTotal} sources`,
+      count:  unique.length,
+    }];
 
     return json({ breaches: unique, dbMatches, sourceStatus, domain, summary });
 

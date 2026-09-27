@@ -47,13 +47,13 @@ const historySec    = $('history-section');
 const MODES = {
   email: {
     label: 'Email Intelligence',
-    desc:  'Analyze an email across 4 free breach databases (30B+ records), infostealer logs, domain intel, Gravatar, and MX records.',
+    desc:  'Analyze an email against the Nyx Data breach database (30B+ records), infostealer logs, domain intel, Gravatar, and MX records.',
     placeholder: 'Enter an email address…',
     icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="2,4 12,13 22,4"/></svg>`,
   },
   breach: {
     label: 'Breach Lookup',
-    desc:  'Check an email across 4 free databases — 30B+ combined records. XposedOrNot (11.6B), BreachDirectory (18B), LeakCheck, and HudsonRock infostealer logs.',
+    desc:  'Check an email against the Nyx Data breach intelligence database — 30B+ records searched instantly.',
     placeholder: 'Enter an email address…',
     icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7z"/><line x1="12" y1="9" x2="12" y2="13"/><circle cx="12" cy="16" r="1" fill="currentColor"/></svg>`,
   },
@@ -291,15 +291,15 @@ function renderEmailResults(data, query) {
   const { breach, email } = data;
   const breaches    = breach?.breaches || [];
   const dbMatches   = breach?.dbMatches || [];
-  const infostealers = breaches.filter(b => b.source?.includes('HudsonRock'));
-  const apiBreaches  = breaches.filter(b => !b.source?.includes('HudsonRock'));
+  const infostealers = breaches.filter(b => b.isInfostealer);
+  const apiBreaches  = breaches.filter(b => !b.isInfostealer);
   const hasAny       = breaches.length > 0 || dbMatches.length > 0;
 
   // Summary
   const summary = el('div', `summary-banner ${hasAny ? 'danger' : 'safe'}`);
   summary.innerHTML = hasAny
-    ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><span><strong>${breaches.length} breach record${breaches.length !== 1 ? 's' : ''} found</strong> for ${esc(query)}</span>`
-    : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><span><strong>No breach records found</strong> for ${esc(query)}</span>`;
+    ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><span><strong>${breaches.length} record${breaches.length !== 1 ? 's' : ''} found in Nyx Data</strong> for ${esc(query)}</span>`
+    : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><span><strong>Not found in Nyx Data</strong> for ${esc(query)}</span>`;
   resultsOutput.appendChild(summary);
 
   // Stats
@@ -319,7 +319,7 @@ function renderEmailResults(data, query) {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       <div>
         <h4>⚠ Infostealer Malware Detected</h4>
-        <p>This email was found in <strong>${infostealers.length}</strong> infostealer log${infostealers.length !== 1 ? 's' : ''} via HudsonRock Cavalier. The device associated with this email may have been compromised by credential-stealing malware. Change passwords immediately.</p>
+        <p>This email was found in <strong>${infostealers.length}</strong> infostealer log${infostealers.length !== 1 ? 's' : ''} in the Nyx Data database. The device associated with this email may have been compromised by credential-stealing malware. Change passwords immediately.</p>
       </div>`;
     resultsOutput.appendChild(alert);
   }
@@ -342,21 +342,21 @@ function renderBreachResults(data, query) {
   const { breach } = data;
   const breaches    = breach?.breaches || [];
   const dbMatches   = breach?.dbMatches || [];
-  const infostealers = breaches.filter(b => b.source?.includes('HudsonRock'));
-  const apiBreaches  = breaches.filter(b => !b.source?.includes('HudsonRock'));
+  const infostealers = breaches.filter(b => b.isInfostealer);
+  const apiBreaches  = breaches.filter(b => !b.isInfostealer);
   const hasAny       = breaches.length > 0;
 
   const summary = el('div', `summary-banner ${hasAny ? 'danger' : 'safe'}`);
   summary.innerHTML = hasAny
-    ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><span><strong>${breaches.length} result${breaches.length !== 1 ? 's' : ''} across all sources</strong> for ${esc(query)}</span>`
-    : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><span><strong>Clean — no records found</strong> for ${esc(query)}</span>`;
+    ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><span><strong>${breaches.length} record${breaches.length !== 1 ? 's' : ''} found in Nyx Data</strong> for ${esc(query)}</span>`
+    : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><span><strong>Not found in Nyx Data</strong> for ${esc(query)}</span>`;
   resultsOutput.appendChild(summary);
 
   if (infostealers.length > 0) {
     const alert = el('div', 'infostealer-alert');
     alert.innerHTML = `
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-      <div><h4>⚠ Infostealer Records Found</h4><p>Found in <strong>${infostealers.length}</strong> infostealer log${infostealers.length !== 1 ? 's' : ''}. Device may be compromised.</p></div>`;
+      <div><h4>⚠ Infostealer Records Found</h4><p>Found in <strong>${infostealers.length}</strong> infostealer log${infostealers.length !== 1 ? 's' : ''} in Nyx Data. Device may be compromised.</p></div>`;
     resultsOutput.appendChild(alert);
   }
 
@@ -364,30 +364,15 @@ function renderBreachResults(data, query) {
   if (infostealers.length > 0) renderInfostealerCard(infostealers);
   if (dbMatches.length > 0) renderDBRefCard(dbMatches, breach?.domain);
 
-  // Source status card
+  // Nyx Data source card
   if (breach?.sourceStatus?.length) {
-    const card = makeCard('Intelligence Sources', 'purple',
-      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`);
+    const card = makeCard('Nyx Data Intelligence', 'purple',
+      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v4c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 9v4c0 1.66 4.03 3 9 3s9-1.34 9-3V9"/><path d="M3 13v4c0 1.66 4.03 3 9 3s9-1.34 9-3v-4"/></svg>`);
     const body = card.querySelector('.card-body');
-
-    // Coverage header
     const note = el('p');
-    note.style.cssText = 'font-size:12px;color:var(--text-2);margin-bottom:12px;';
-    note.innerHTML = `Queried <strong>4 free databases</strong> covering <strong>~30B+ records</strong> simultaneously.`;
+    note.style.cssText = 'font-size:13px;color:var(--text-2);';
+    note.innerHTML = `Searched across <strong style="color:var(--accent)">30B+ records</strong> in the Nyx Data breach intelligence database.`;
     body.appendChild(note);
-
-    body.appendChild(makeSimpleTable(
-      ['Source', 'Coverage', 'Results'],
-      breach.sourceStatus.map(s => {
-        const coverage = {
-          'XposedOrNot':   '11.6B+ records / 779 breaches',
-          'BreachDirectory':'18B+ records',
-          'LeakCheck':     'Multi-source index',
-          'HudsonRock':    '30M+ infostealer logs',
-        }[s.source] || '—';
-        return [s.source, coverage, s.error ? `⚠ ${s.error}` : s.status];
-      })
-    ));
     resultsOutput.appendChild(card);
   }
 }
@@ -402,21 +387,19 @@ function renderBreachCard(breaches, sourceStatus) {
 
   if (breaches.length === 0) {
     const p = el('p'); p.style.cssText = 'color:var(--green);font-size:13px;';
-    p.textContent = '✔  No breach records detected across queried sources.';
+    p.textContent = '✔  Not found in Nyx Data.';
     body.appendChild(p);
   } else {
     const table = el('table', 'data-table');
-    table.innerHTML = `<thead><tr><th>Breach / Source</th><th>Date</th><th>Records</th><th>Data Types</th><th>Source</th></tr></thead>`;
+    table.innerHTML = `<thead><tr><th>Breach Name</th><th>Date</th><th>Records</th><th>Data Types</th></tr></thead>`;
     const tbody = el('tbody');
     breaches.forEach(b => {
       const tr = el('tr');
-      const srcClass = (b.source || '').toLowerCase().includes('hudson') ? 'hudsonrock' : (b.source || '').toLowerCase().includes('hibp') ? 'hibp' : 'leakcheck';
       tr.innerHTML = `
         <td class="name">${esc(b.name || 'Unknown')}</td>
         <td>${esc(b.date || '—')}</td>
         <td>${b.pwnCount ? Number(b.pwnCount).toLocaleString() : '—'}</td>
-        <td class="text-dim">${(b.dataClasses || []).slice(0, 4).map(esc).join(', ') || '—'}</td>
-        <td><span class="source-badge ${srcClass}">${esc(b.source || '—')}</span></td>`;
+        <td class="text-dim">${(b.dataClasses || []).slice(0, 4).map(esc).join(', ') || '—'}</td>`;
       tbody.appendChild(tr);
     });
     table.appendChild(tbody);
