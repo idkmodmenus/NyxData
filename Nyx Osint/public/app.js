@@ -9,6 +9,7 @@ const state = {
   loading:     false,
   lastResults: null,
   lastQuery:   '',
+  lastMode:    'email',
   breachDB:    null,   // loaded once
 };
 
@@ -146,25 +147,28 @@ searchForm.addEventListener('submit', async e => {
 });
 
 async function runSearch(query) {
+  const mode = state.mode;
   state.loading   = true;
-  state.lastQuery = query;
+  state.lastQuery = mode === 'password' ? '[REDACTED]' : query;
+  state.lastMode  = mode;
   searchBtn.disabled = true;
   showLoading('Initializing…');
 
   try {
     let results;
-    if      (state.mode === 'email')    results = await searchEmail(query);
-    else if (state.mode === 'breach')   results = await searchBreach(query);
-    else if (state.mode === 'password') results = await searchPassword(query);
-    else if (state.mode === 'username') results = await searchUsername(query);
-    else if (state.mode === 'phone')    results = await searchPhone(query);
-    else if (state.mode === 'ip')       results = await searchIP(query);
+    if      (mode === 'email')    results = await searchEmail(query);
+    else if (mode === 'breach')   results = await searchBreach(query);
+    else if (mode === 'password') results = await searchPassword(query);
+    else if (mode === 'username') results = await searchUsername(query);
+    else if (mode === 'phone')    results = await searchPhone(query);
+    else if (mode === 'ip')       results = await searchIP(query);
 
+    if (state.mode !== mode) return;
     state.lastResults = results;
-    addToHistory(query, state.mode);
-    renderResults(results, state.mode, query);
+    addToHistory(query, mode);
+    renderResults(results, mode, query);
   } catch (err) {
-    showError(`Search failed: ${err.message}`);
+    if (state.mode === mode) showError(`Search failed: ${err.message}`);
   } finally {
     state.loading = false;
     searchBtn.disabled = false;
@@ -281,7 +285,7 @@ function renderResults(data, mode, query) {
 
   // Export bar
   const bar = el('div', 'export-bar');
-  bar.innerHTML = `<span class="export-bar-label">Results for <strong class="mono">${esc(query)}</strong></span><button class="export-bar-btn" id="open-export-btn">⬇ Export</button>`;
+  bar.innerHTML = `<span class="export-bar-label">Results for <strong class="mono">${esc(mode === 'password' ? '[REDACTED]' : query)}</strong></span><button class="export-bar-btn" id="open-export-btn">⬇ Export</button>`;
   resultsOutput.appendChild(bar);
   bar.querySelector('#open-export-btn').addEventListener('click', openExportModal);
 }
@@ -293,11 +297,17 @@ function renderEmailResults(data, query) {
   const dbMatches   = breach?.dbMatches || [];
   const infostealers = breaches.filter(b => b.isInfostealer);
   const apiBreaches  = breaches.filter(b => !b.isInfostealer);
-  const hasAny       = breaches.length > 0 || dbMatches.length > 0;
+  const hasAny       = breaches.length > 0;
+  const domainOnly   = !hasAny && dbMatches.length > 0;
+  const incomplete   = breach?.sourceStatus?.some(source => source.status !== 'complete');
 
   // Summary
-  const summary = el('div', `summary-banner ${hasAny ? 'danger' : 'safe'}`);
-  summary.innerHTML = hasAny
+  const summary = el('div', `summary-banner ${incomplete || domainOnly ? 'warn' : hasAny ? 'danger' : 'safe'}`);
+  summary.innerHTML = incomplete
+    ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span><strong>Incomplete scan</strong> — ${breach.sourceStatus.filter(source => source.status === 'complete').length}/${breach.sourceStatus.length} sources responded${breaches.length ? `; ${breaches.length} result${breaches.length === 1 ? '' : 's'} found` : ''}. No-match results are not conclusive.</span>`
+    : domainOnly
+      ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>No direct email match found. The domain appears in ${dbMatches.length} known breach record${dbMatches.length === 1 ? '' : 's'}; this does not confirm this address was exposed.</span>`
+    : hasAny
     ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><span><strong>${breaches.length} record${breaches.length !== 1 ? 's' : ''} found in Nyx Data</strong> for ${esc(query)}</span>`
     : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><span><strong>Not found in Nyx Data</strong> for ${esc(query)}</span>`;
   resultsOutput.appendChild(summary);
@@ -345,9 +355,12 @@ function renderBreachResults(data, query) {
   const infostealers = breaches.filter(b => b.isInfostealer);
   const apiBreaches  = breaches.filter(b => !b.isInfostealer);
   const hasAny       = breaches.length > 0;
+  const incomplete   = breach?.sourceStatus?.some(source => source.status !== 'complete');
 
-  const summary = el('div', `summary-banner ${hasAny ? 'danger' : 'safe'}`);
-  summary.innerHTML = hasAny
+  const summary = el('div', `summary-banner ${incomplete ? 'warn' : hasAny ? 'danger' : 'safe'}`);
+  summary.innerHTML = incomplete
+    ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span><strong>Incomplete scan</strong> — ${breach.sourceStatus.filter(source => source.status === 'complete').length}/${breach.sourceStatus.length} sources responded${breaches.length ? `; ${breaches.length} result${breaches.length === 1 ? '' : 's'} found` : ''}. No-match results are not conclusive.</span>`
+    : hasAny
     ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><span><strong>${breaches.length} record${breaches.length !== 1 ? 's' : ''} found in Nyx Data</strong> for ${esc(query)}</span>`
     : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><span><strong>Not found in Nyx Data</strong> for ${esc(query)}</span>`;
   resultsOutput.appendChild(summary);
@@ -364,15 +377,16 @@ function renderBreachResults(data, query) {
   if (infostealers.length > 0) renderInfostealerCard(infostealers);
   if (dbMatches.length > 0) renderDBRefCard(dbMatches, breach?.domain);
 
-  // Nyx Data source card
+  // Source coverage
   if (breach?.sourceStatus?.length) {
-    const card = makeCard('Nyx Data Intelligence', 'purple',
+    const card = makeCard('Source Coverage', 'purple',
       `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v4c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 9v4c0 1.66 4.03 3 9 3s9-1.34 9-3V9"/><path d="M3 13v4c0 1.66 4.03 3 9 3s9-1.34 9-3v-4"/></svg>`);
     const body = card.querySelector('.card-body');
-    const note = el('p');
-    note.style.cssText = 'font-size:13px;color:var(--text-2);';
-    note.innerHTML = `Searched across <strong style="color:var(--accent)">30B+ records</strong> in the Nyx Data breach intelligence database.`;
-    body.appendChild(note);
+    body.appendChild(makeSimpleTable(['Source', 'Status', 'Results'], breach.sourceStatus.map(source => [
+      source.source,
+      source.status === 'complete' ? 'Responded' : `Unavailable${source.error ? `: ${source.error}` : ''}`,
+      source.count,
+    ])));
     resultsOutput.appendChild(card);
   }
 }
@@ -863,10 +877,19 @@ function showError(msg) {
 }
 
 // ── History ───────────────────────────────────────────────────
-function loadHistory()    { try { return JSON.parse(localStorage.getItem('nyx_history') || '[]'); } catch { return []; } }
-function saveHistory(h)   { localStorage.setItem('nyx_history', JSON.stringify(h)); }
+function loadHistory() {
+  try {
+    const history = JSON.parse(localStorage.getItem('nyx_history') || '[]');
+    if (!Array.isArray(history)) return [];
+    const safeHistory = history.filter(item => item && item.mode !== 'password');
+    if (safeHistory.length !== history.length) saveHistory(safeHistory);
+    return safeHistory;
+  } catch { return []; }
+}
+function saveHistory(h)   { try { localStorage.setItem('nyx_history', JSON.stringify(h)); } catch {} }
 
 function addToHistory(query, mode) {
+  if (mode === 'password') return;
   let h = loadHistory().filter(i => !(i.query === query && i.mode === mode));
   h.unshift({ query, mode, ts: Date.now() });
   if (h.length > 20) h = h.slice(0, 20);
@@ -900,17 +923,17 @@ modalClose.addEventListener('click', closeExportModal);
 exportModal.addEventListener('click', e => { if (e.target === exportModal) closeExportModal(); });
 
 $('export-json').addEventListener('click', () => {
-  downloadFile(JSON.stringify({ query: state.lastQuery, mode: state.mode, results: state.lastResults, timestamp: new Date().toISOString() }, null, 2), `nyx-${state.lastQuery}-${state.mode}.json`, 'application/json');
+  downloadFile(JSON.stringify({ query: state.lastQuery, mode: state.lastMode, results: state.lastResults, timestamp: new Date().toISOString() }, null, 2), `nyx-${state.lastQuery}-${state.lastMode}.json`, 'application/json');
   closeExportModal();
 });
 
 $('export-csv').addEventListener('click', () => {
-  downloadFile(resultsToCSV(state.lastResults, state.mode, state.lastQuery), `nyx-${state.lastQuery}-${state.mode}.csv`, 'text/csv');
+  downloadFile(resultsToCSV(state.lastResults, state.lastMode, state.lastQuery), `nyx-${state.lastQuery}-${state.lastMode}.csv`, 'text/csv');
   closeExportModal();
 });
 
 $('export-html').addEventListener('click', () => {
-  downloadFile(generateHTMLReport(state.lastQuery, state.mode, state.lastResults), `nyx-report-${state.lastQuery}.html`, 'text/html');
+  downloadFile(generateHTMLReport(state.lastQuery, state.lastMode, state.lastResults), `nyx-report-${state.lastQuery}.html`, 'text/html');
   closeExportModal();
 });
 

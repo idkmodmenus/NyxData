@@ -80,12 +80,19 @@ export async function onRequestPost(context) {
       sourcesResponded: sourcesOk,
     };
 
-    // Single unified status shown to frontend
-    const sourceStatus = [{
-      source: 'Nyx Data',
-      status: `${unique.length} result(s) across ${sourcesOk}/${sourcesTotal} sources`,
-      count:  unique.length,
-    }];
+    const sourceStatus = settled.map((result, index) => {
+      const sourceResult = result.status === 'fulfilled' ? result.value : null;
+      const source = sourceResult?.source || ['XposedOrNot', 'BreachDirectory', 'LeakCheck', 'HudsonRock'][index];
+      const error = result.status === 'rejected'
+        ? result.reason?.message || 'Unavailable'
+        : sourceResult.error || null;
+      return {
+        source,
+        status: error ? 'unavailable' : 'complete',
+        error,
+        count: (sourceResult?.breaches || []).length,
+      };
+    });
 
     return json({ breaches: unique, dbMatches, sourceStatus, domain, summary });
 
@@ -117,6 +124,12 @@ async function checkXposedOrNot(email) {
     ]);
 
     // Parse check-email — returns { breaches: [['BreachName', ...]] } or { Error: 'Not found' }
+    const unavailable = result => result.status === 'rejected' ||
+      (result.value.status >= 400 && result.value.status !== 404);
+    if (unavailable(checkRes) && unavailable(analyticsRes)) {
+      return { source: SOURCE, error: 'Unavailable', breaches: [] };
+    }
+
     let breachNames = [];
     if (checkRes.status === 'fulfilled' && checkRes.value.ok) {
       try {
