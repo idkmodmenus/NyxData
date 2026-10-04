@@ -25,10 +25,10 @@ Search emails, usernames, breaches, and IP/domains — all from a clean dark-the
 
 1. Push this folder to a GitHub repo
 2. Go to [Cloudflare Dashboard → Pages](https://dash.cloudflare.com/) → **Create a project**
-3. Connect your GitHub repo
+3. Connect your GitHub repo as a **Pages** project (not a Workers project)
 4. Build settings:
    - **Framework preset:** None
-   - **Build command:** *(leave empty)*
+   - **Build command:** *(leave empty; do not use `wrangler deploy`)*
    - **Build output directory:** `public`
 5. Click **Save and Deploy**
 
@@ -41,9 +41,11 @@ npm install -g wrangler
 # Login to Cloudflare
 wrangler login
 
-# Deploy
-wrangler pages deploy public --project-name=nyx-osint
+# Deploy the Pages site and its Functions
+wrangler pages deploy public --project-name=nyxosint
 ```
+
+The project name must match the Pages project in your Cloudflare account. If it already has a different name, replace `nyxosint` above with that exact name. This repository uses Pages Functions in `functions/`; the generic `wrangler deploy` command targets Workers and does not deploy this Pages project.
 
 ---
 
